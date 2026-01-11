@@ -4,19 +4,16 @@ import jwt from 'jsonwebtoken';
 // Custom modules
 import config from '@/config';
 
-// Types
-import { Types } from 'mongoose'
+export const generateAccessToken = (userId: any) => {
+    return jwt.sign({}, config.JWT_ACCESS_SECRET, {
+        subject: String(userId),
+        expiresIn: "15m",
+    });
+};
 
-export const generateAccessToken = (userId: Types.ObjectId): string => {
-    return jwt.sign({userId}, config.JWT_ACCESS_SECRET, {
-        expiresIn: config.JWT_ACCESS_EXPIRY,
-        subject: 'Access Token',
-    })
-}
-
-export const generateRefreshToken = (userId: Types.ObjectId): string => {
-    return jwt.sign({userId}, config.JWT_REFRESH_SECRET, {
-        expiresIn: config.JWT_REFRESH_EXPIRY,
-        subject: 'Refresh Token',
-    })
-}
+export const generateRefreshToken = (userId: any) => {
+    return jwt.sign({}, config.JWT_REFRESH_SECRET, {
+        subject: String(userId),
+        expiresIn: "7d",
+    });
+};

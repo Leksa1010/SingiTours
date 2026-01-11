@@ -11,11 +11,25 @@ import Token from "@/models/token";
 type RegisterBody = {
     email: string;
     password: string;
+    role?: "operator" | "traveller";
 };
 
 const register = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { email, password } = req.body as RegisterBody;
+        const { email, password, role } = req.body as RegisterBody;
+
+        // default: traveller
+        const requestedRole: "operator" | "traveller" = role ?? "traveller";
+
+        // allow operator ONLY if whitelisted
+        if (requestedRole === "operator" && !config.WHITELIST_OPERATORS_MAIL.includes(email)) {
+            res.status(403).json({
+                code: "Authorization Error",
+                message: "Insufficient privileges!",
+            });
+            logger.warn("Non-whitelisted operator registration attempt", { email });
+            return;
+        }
 
         const username = genUsername();
 
@@ -23,13 +37,12 @@ const register = async (req: Request, res: Response): Promise<void> => {
             username,
             email,
             password,
-            role: "traveller",
+            role: requestedRole,
         });
 
         const accessToken = generateAccessToken(newUser._id);
         const refreshToken = generateRefreshToken(newUser._id);
 
-        // 1 refresh token per user
         await Token.findOneAndUpdate(
             { userId: newUser._id },
             { token: refreshToken },
@@ -38,7 +51,6 @@ const register = async (req: Request, res: Response): Promise<void> => {
 
         const isProd = config.NODE_ENV === "production";
 
-        // Same cookie as in login
         res.cookie("accessToken", accessToken, {
             httpOnly: true,
             secure: isProd,
@@ -55,7 +67,6 @@ const register = async (req: Request, res: Response): Promise<void> => {
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
-        // No password in response
         res.status(201).json({
             user: {
                 id: newUser._id,
@@ -65,12 +76,7 @@ const register = async (req: Request, res: Response): Promise<void> => {
             },
         });
 
-        // No password nor token in log
-        logger.info("User registered", {
-            userId: newUser._id,
-            email: newUser.email,
-            role: newUser.role,
-        });
+        logger.info("User registered", { userId: newUser._id, email: newUser.email, role: newUser.role });
     } catch (err) {
         logger.error("Error while registering user", err);
         res.status(500).json({
