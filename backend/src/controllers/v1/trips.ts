@@ -73,6 +73,20 @@ export const createTrip = async (req: Request, res: Response) => {
 export const updateTrip = async (req: Request, res: Response) => {
     const update: any = { ...req.body };
 
+    // Types normalization (no strings in db)
+    if (update.price !== undefined) {
+        update.price = Number(update.price);
+    }
+
+    if (update.startsAt) {
+        update.startsAt = new Date(update.startsAt);
+    }
+
+    if (update.endsAt) {
+        update.endsAt = new Date(update.endsAt);
+    }
+
+    // If title is changed, regenerate slug
     if (update.title) {
         const baseSlug = makeSlug(update.title);
         let slug = baseSlug;
@@ -83,13 +97,22 @@ export const updateTrip = async (req: Request, res: Response) => {
         update.slug = slug;
     }
 
-    if (req.file) update.coverImageUrl = `/uploads/${req.file.filename}`;
+    if (req.file) {
+        update.coverImageUrl = `/uploads/${req.file.filename}`;
+    }
 
-    const trip = await Trip.findByIdAndUpdate(req.params.id, update, { new: true }).lean().exec();
-    if (!trip) return res.status(404).json({
-        code: "NotFound",
-        message: "Trip not found"
-    });
+    const trip = await Trip.findByIdAndUpdate(
+        req.params.id,
+        update,
+        { new: true }
+    ).lean().exec();
+
+    if (!trip) {
+        return res.status(404).json({
+            code: "NotFound",
+            message: "Trip not found",
+        });
+    }
 
     res.status(200).json({ trip });
 };
